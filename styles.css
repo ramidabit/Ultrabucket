@@ -1,0 +1,25 @@
+.btn {
+	background:linear-gradient(to bottom, #e5e5e5 5%, #fefefe 100%);
+	background-color:#e5e5e5;
+	border-radius:15px;
+	border:1px solid #303030;
+	display:inline-block;
+	cursor:pointer;
+	color:#b72110;
+	font-family:Trebuchet MS;
+	font-size:18px;
+	font-weight:bold;
+	padding:14px 20px;
+	text-decoration:none;
+	text-shadow:0px 1px 0px #fcfcfc;
+}
+
+.btn:hover {
+	background:linear-gradient(to bottom, #fefefe 5%, #e5e5e5 100%);
+	background-color:#fefefe;
+}
+
+.btn:active {
+	position:relative;
+	top:1px;
+}

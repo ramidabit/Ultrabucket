@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="styles.css">
 [Parts](https://ramidabit.github.io/ultrabucket/parts){: .btn}
 [Updates](https://ramidabit.github.io/ultrabucket/updates){: .btn}
 

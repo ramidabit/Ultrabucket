@@ -1,3 +1,7 @@
+[Parts](https://ramidabit.github.io/ultrabucket/parts){: .btn}
+[Updates](https://ramidabit.github.io/ultrabucket/updates){: .btn}
+
+
 ## The Ultrabucket Pro
 
 Rami Dabit, Kyle Kam

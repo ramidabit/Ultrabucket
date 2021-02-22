@@ -1,4 +1,5 @@
-<button name="button" onclick="https://ramidabit.github.io/ultrabucket/">Home</button>
+[Home](https://ramidabit.github.io/ultrabucket/){: .btn}
+[Updates](https://ramidabit.github.io/ultrabucket/updates){: .btn}
 
 
 ## Parts

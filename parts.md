@@ -1,4 +1,5 @@
-<button name="homeButton" onclick="https://ramidabit.github.io/ultrabucket/">Home</button>
+<button name="button" onclick="https://ramidabit.github.io/ultrabucket/">Home</button>
+
 
 ## Parts
 

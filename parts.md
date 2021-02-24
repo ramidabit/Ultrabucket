@@ -5,7 +5,6 @@
 
 ## Parts
 
-
 ### Peripherals
 - HC-SR04 Ultrasonic Sensor
 - HC-05 Bluetooth Module

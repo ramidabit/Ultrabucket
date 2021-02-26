@@ -6,10 +6,10 @@
 ## Parts
 
 ### Peripherals
-- HC-SR04 Ultrasonic Sensor
-- HC-05 Bluetooth Module
+- HC-SR04 Ultrasonic Sensors (2-3)
 - L3GD20 Gyroscope
 
 ### Serial Interface Protocols
-- UART
+- I2C
+- I2S
 - SPI

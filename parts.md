@@ -10,6 +10,6 @@
 - L3GD20 Gyroscope
 
 ### Serial Interface Protocols
-- I2C
 - I2S
+- I2C
 - SPI

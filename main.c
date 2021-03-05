@@ -1,15 +1,29 @@
 /*
- * ECE 153B - Summer 2020
+ * ECE 153B - Winter 2021
  *
- * Name: Rami Dabit
+ * Names: Rami Dabit, Kyle Kam
  * Section: Wednesday 7:00-9:50pm
- * Lab: 3B
  */
- 
-#include <stdio.h> 
- 
+
+#include "LCD.h"
+#include "L3GD20.h"
+#include "UART.h"
+#include "SPI.h"
+#include "SysClock.h"
+#include "SysTimer.h"
 #include "stm32l476xx.h"
-#include "lcd.h"
+#include <stdio.h>
+
+// Threshold for toggling functionality using gyroscope
+int THRESHOLD = 300;
+
+typedef struct {
+	float x; 
+	float y; 
+	float z; 
+} L3GD20_Data_t;
+
+L3GD20_Data_t currentSpeed;
 
 uint32_t volatile currentValue = 0;
 uint32_t volatile lastValue = 0;
@@ -164,7 +178,51 @@ void TIM4_IRQHandler(void) {
 	}
 }
 
-int main(void) {	
+void setStationary(int xStat, int yStat, int zStat) {
+	// Calibrate X, Y, and Z by adjusting toward the opposite direction
+	currentSpeed.x += -1*xStat;
+	currentSpeed.y += -1*yStat;
+	currentSpeed.x += -1*zStat;
+};
+
+void getSpeed(uint8_t highAddr, uint8_t lowAddr, uint8_t direction) {
+	int16_t speed = 0;
+
+	// Check current status of the gyroscope
+	uint8_t temp = 0;
+	GYRO_IO_Read(&temp, L3GD20_STATUS_REG_ADDR, sizeof(temp));
+	// Make sure there is a new speed to read
+	if(temp & direction) {
+		temp = 0;			// Read in upper 8 bits
+		GYRO_IO_Read(&temp, highAddr, sizeof(temp));
+		speed |= temp << 8;
+		temp = 0;			// Read in lower 8 bits
+		GYRO_IO_Read(&temp, lowAddr, sizeof(temp));
+		speed |= temp;
+	}
+
+	// If speed is negative, convert out of 2's complement
+	if(speed & 0x80) speed = -1*(~speed + 0x1);
+	// Convert to degrees per second
+	speed = 0.07*speed;
+
+	if(direction & 0x1) {
+		currentSpeed.x = speed;
+	} else if(direction & 0x2) {
+		currentSpeed.y = speed;
+	} else if(direction & 0x4) {
+		currentSpeed.z = speed;
+	}
+}
+
+void updateSpeed() {
+	// Results are stored in currentSpeed global variable
+	getSpeed(L3GD20_OUT_X_H_ADDR, L3GD20_OUT_X_L_ADDR, 0x1);
+	getSpeed(L3GD20_OUT_Y_H_ADDR, L3GD20_OUT_Y_L_ADDR, 0x2);
+	getSpeed(L3GD20_OUT_Z_H_ADDR, L3GD20_OUT_Z_L_ADDR, 0x4);
+};
+
+int main(void){
 	// Enable High Speed Internal Clock (HSI = 16 MHz)
 	RCC->CR |= RCC_CR_HSION;
 	while ((RCC->CR & RCC_CR_HSIRDY) == 0); // Wait until HSI is ready
@@ -173,29 +231,64 @@ int main(void) {
 	RCC->CFGR &= ~RCC_CFGR_SW;
 	RCC->CFGR |= RCC_CFGR_SW_HSI;
 	while ((RCC->CFGR & RCC_CFGR_SWS) == 0); // Wait until HSI is system clock source
-  
+
+	System_Clock_Init();   // System Clock = 80 MHz
+	SysTick_Init();
+
 	// Input Capture Setup
 	Input_Capture_Setup();
 	
 	// Trigger Setup
 	Trigger_Setup();
 
-	// Setup LCD
+	// LCD Setup
 	LCD_Initialization();
 	LCD_Clear();
-	
+
+	// Initialize Gyroscope
+	GYRO_Init();  
+
+	// Initialize USART2
+	UART2_Init();
+	UART2_GPIO_Init();
+	USART_Init(USART2);
+
+	// Initalize currentSpeed
+	updateSpeed();
+
+	bool active = 0;
 	char message[6];
 	while(1) {
-		// The HC-SR04 sensor can measure distances between 2cm and 400cm
+		// Note: Our X value is -1 when the board is stationary, so we must calibrate
+		//  or adjust the velocity values based on the gyroscope's default readings
+		setStationary(-1, 0, 0);
 
-		if(timeInterval <= 58*400 && timeInterval >= 58*2) {
-			// Convert sensor measurements to a distance in cm
-			sprintf(message, "%6d", timeInterval / 58);
+		// Use gyroscope reading to toggle functionality
+		if(currentSpeed.x > THRESHOLD || currentSpeed.x < -1*THRESHOLD ||
+			 currentSpeed.y > THRESHOLD || currentSpeed.y < -1*THRESHOLD) {
+			active = !active;
+		}
+
+		if(active) {
+			// The HC-SR04 sensor can measure distances between 2cm and 400cm
+			if(timeInterval <= 58*400 && timeInterval >= 58*2) {
+				// Convert sensor measurements to a distance in cm
+				sprintf(message, "%6d", timeInterval / 58);
+			} else {
+				// No object in range
+				sprintf(message, "%s", "------");
+			}
 		} else {
-			// No object in range
-			sprintf(message, "%s", "------");
+			sprintf(message, "%s", " OFF  ");
 		}
 		
 		LCD_DisplayString((uint8_t *) message);
+
+		// Connection to Termite available for testing and debugging
+		printf("Current Angular Velocity\n   X: %.01f\n   Y: %.01f\n   Z: %.01f\n\n",
+				currentSpeed.x, currentSpeed.y, currentSpeed.z);
+		
+		updateSpeed();
+		delay(500); // Small delay between receiving measurements
 	}
 }

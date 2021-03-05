@@ -1,9 +1,8 @@
 /*
  * ECE 153B - Winter 2021
  *
- * Name: Rami Dabit
+ * Names: Rami Dabit, Kyle Kam
  * Section: Wednesday 7:00-9:50pm
- * Lab: 4B
  */
 
 #include "UART.h"

@@ -12,3 +12,9 @@
 - Refined sound delivery method to use DAC, I2C, and I2S with onboard stereo jack rather than bluetooth.
 - Updated parts list and block diagram to reflect above changes.
 - Imported initial work with ultrasonic sensor and onboard gyroscope.
+
+### March 5, 2021
+- Got toggling functionality working using gyroscope and one ultrasonic sensor
+  - In the process of reading distance on multiple channels
+- Some work done initalizing audio jack
+- Made plans to acquire hat which will house components

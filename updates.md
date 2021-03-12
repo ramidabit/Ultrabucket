@@ -14,7 +14,13 @@
 - Imported initial work with ultrasonic sensor and onboard gyroscope.
 
 ### March 5, 2021
-- Got toggling functionality working using gyroscope and one ultrasonic sensor
+- Got toggling functionality working using gyroscope and one ultrasonic sensor.
   - In the process of reading distance on multiple channels
-- Some work done initalizing audio jack
-- Made plans to acquire hat which will house components
+- Some work done regarding initialization of audio jack.
+- Made plans to acquire hat which will house components.
+
+### March 12, 2021
+- Achieved dual channel distance reading using two ultrasonic sensors.
+   - Added a low-power state by disabling clocks when no reading is desired.
+- Output some static noise by interfacing with audio jack.
+- Acquired hat and LED strip for plans to add an active/inactive indicator.

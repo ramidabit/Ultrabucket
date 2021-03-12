@@ -22,6 +22,6 @@
 ### March 12, 2021
 - Achieved dual channel distance reading using two ultrasonic sensors.
    - Added a low-power state by disabling clocks when no reading is desired.
-     ![Image](https://i.imgur.com/WmtGEfy.jpg)
+     ![Image](https://i.imgur.com/KZES5GR.png)
 - Output some static noise by interfacing with audio jack.
 - Acquired hat and LED strip for plans to add an active/inactive indicator.

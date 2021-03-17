@@ -31,25 +31,45 @@ void NextBuffer(int which_half) {
 
 	/* Decode next frame */
 	if (which_half == 0) {
-		for(int i=0; i<AUDIO_BUFSIZ; i++) {
-				audio_buf[i] = (uint16_t)(32766*sinf(coef*i)+32768);
-			}
-	}
-	else if (which_half == 1){
-		for(int i=0; i<AUDIO_BUFSIZ; i++) {
-				audio_buf[AUDIO_BUFSIZ + i] = (uint16_t)(32766*sinf(coef*i)+32768);
-			}
-	}
-	else if (which_half == 2){
-		for(int i=0; i<AUDIO_BUFSIZ; i++) {
-				audio_buf[i] = (uint16_t)(32768);
-			}
-	}
-	else if (which_half == 3){
-		for(int i=0; i<AUDIO_BUFSIZ; i++) {
-				audio_buf[AUDIO_BUFSIZ + i] = (uint16_t)(32768);
-			}
-	}
+        for(int i=0; i<AUDIO_BUFSIZ; i++) {
+                audio_buf[i] = (uint16_t)(32766*sinf((900*coef*i)+32768));
+            }
+    }
+    else if (which_half == 1){
+        for(int i=0; i<AUDIO_BUFSIZ; i++) {
+                audio_buf[AUDIO_BUFSIZ + i] = (uint16_t)(32766*sinf(900*coef*i)+32768);
+            }
+    }
+    else if (which_half == 2){
+        for(int i=0; i<AUDIO_BUFSIZ; i++) {
+                audio_buf[i] = (uint16_t)(32766*sinf((440*coef*i)+32768));
+            }
+    }
+    else if (which_half == 3){
+        for(int i=0; i<AUDIO_BUFSIZ; i++) {
+                audio_buf[AUDIO_BUFSIZ + i] = (uint16_t)(32766*sinf(440*coef*i)+32768);
+            }
+    }
+    else if (which_half == 4){
+        for(int i=0; i<AUDIO_BUFSIZ; i++) {
+                audio_buf[i] = (uint16_t)(32766*sinf((110*coef*i)+32768));
+            }
+    }
+    else if (which_half == 5){
+        for(int i=0; i<AUDIO_BUFSIZ; i++) {
+                audio_buf[AUDIO_BUFSIZ + i] = (uint16_t)(32766*sinf(110*coef*i)+32768);
+            }
+    }
+    else if (which_half == 6){
+        for(int i=0; i<AUDIO_BUFSIZ; i++) {
+                audio_buf[i] = (uint16_t)(32768);
+            }
+    }
+    else if (which_half == 7){
+        for(int i=0; i<AUDIO_BUFSIZ; i++) {
+                audio_buf[AUDIO_BUFSIZ + i] = (uint16_t)(32768);
+            }
+    }
 }
 
 static void DMA_IRQHandler(void) {

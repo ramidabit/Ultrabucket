@@ -45,6 +45,51 @@ uint32_t volatile timeInterval_1 = 0;
 uint32_t volatile timeInterval_2 = 0;
 uint32_t volatile timeInterval_3 = 0;
 
+void PWM_Init() {
+    // Enable GPIO port E clock
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOEEN;
+    // Configure PE8 as alternative function (10)
+    GPIOE->MODER &= ~GPIO_MODER_MODE8;
+    GPIOE->MODER |= GPIO_MODER_MODE8_1;
+    // Configure and select alternative function for PE8 (AF1)
+    GPIOE->AFR[1] &= ~GPIO_AFRL_AFRL0;
+    GPIOE->AFR[1] |= 0x1;
+    // Configure PE8 output speed as very high (11)
+    GPIOE->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR8;
+    // Configure PE8 as no pull-up, no pull-down (00)
+    GPIOE->PUPDR &= ~GPIO_PUPDR_PUPD8;
+
+    // Enable TIM1 clock
+    RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
+    // Configure PWM Output for TIM1 CH 1N
+    // Set direction such that timer counts down
+    TIM1->CR1 |= TIM_CR1_DIR;
+    // Set prescaler value
+    TIM1->PSC &= ~TIM_PSC_PSC;
+    // Set auto-reload value
+    TIM1->ARR &= ~TIM_ARR_ARR;
+    TIM1->ARR |= 0x13;
+    // Configure channel to be used in output compare mode
+    // Clear the output compare mode bits
+    TIM1->CCMR1 &= ~TIM_CCMR1_OC1M;
+    // Set output compare mode bits to PWM mode 1
+    TIM1->CCMR1 |= TIM_CCMR1_OC1M_1;
+    TIM1->CCMR1 |= TIM_CCMR1_OC1M_2;
+    // Enable output preload
+    TIM1->CCMR1 |= TIM_CCMR1_OC1PE;
+    // Set the output polarity for compare 1 to active high
+    TIM1->CCER &= ~TIM_CCER_CC1NP;
+    // Enable channel 1N output
+    TIM1->CCER |= TIM_CCER_CC1NE;
+    // Enable main output
+    TIM1->BDTR |= TIM_BDTR_MOE;
+    // Set capture/compare value for duty cycle of PWM output
+    TIM1->CCR1 &= ~TIM_CCR1_CCR1;
+    TIM1->CCR1 |= 0x7;
+    // Enable the counter
+    TIM1->CR1 |= 0x1;
+}
+
 void Trigger_Setup() {
 	// Enable GPIO port E clock
 	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOEEN;
@@ -368,25 +413,7 @@ void exitLowPowerState() {
 	RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
 }
 
-void playBeeps(int speed) {
-	NextBuffer(0);
-	NextBuffer(1);
-
-	if(speed == 0) {
-		delay(93);
-	} else if(speed == 1) {
-		delay(88);
-	} else if(speed == 2) {
-		delay(83);
-	} else {
-		delay(0);
-	}
-
-	NextBuffer(2);
-	NextBuffer(3);
-}
-
-int main(void){
+int main(void) {
 	// Enable High Speed Internal Clock (HSI = 16 MHz)
 	RCC->CR |= RCC_CR_HSION;
 	// Select HSI as system clock source 
@@ -396,8 +423,8 @@ int main(void){
 	while ((RCC->CFGR & RCC_CFGR_SWS) == 0);
 	while ((RCC->CR & RCC_CR_HSIRDY) == 0);
 
-	System_Clock_Init();
 	SysTick_Init();
+	System_Clock_Init();
 
 	LCD_Initialization();
 	LCD_Clear();
@@ -405,6 +432,8 @@ int main(void){
 	UART2_Init();
 	UART2_GPIO_Init();
 	USART_Init(USART2);
+
+	PWM_Init();
 
 	// Trigger Setup (The same trigger is used for all sensors)
 	Trigger_Setup();
@@ -437,7 +466,7 @@ int main(void){
 	// Initialize DAC for audio
 	cs43l22_play();
 
-	bool active = 1;
+	bool active = 0;
 	bool sensor1 = 0;
 	bool sensor2 = 0;
 	bool sensor3 = 0;
@@ -458,16 +487,19 @@ int main(void){
 		}
 
 		if(active) {
+			sprintf(message, "%s", "  ON  ");
+			TIM1->CCR1 &= ~TIM_CCR1_CCR1;
+			TIM1->CCR1 |= 0xD;
 			exitLowPowerState();
 			DMA_Init();
 
-			// The HC-SR04 sensor can measure distances between 2cm and 400cm,
-			//  but the user will soon hit something if they are within 100cm
-			sensor1 = (timeInterval_1 < 58*100 && timeInterval_1 >= 58*2) ? 1 : 0;
-			sensor2 = (timeInterval_2 < 58*100 && timeInterval_2 >= 58*2) ? 1 : 0;
-			sensor3 = (timeInterval_3 < 58*100 && timeInterval_3 >= 58*2) ? 1 : 0;
+			// The HC-SR04 sensor can measure distances between 2cm and 400cm
+			sensor1 = (timeInterval_1 < 58*400 && timeInterval_1 >= 58*2) ? 1 : 0;
+			sensor2 = (timeInterval_2 < 58*400 && timeInterval_2 >= 58*2) ? 1 : 0;
+			sensor3 = (timeInterval_3 < 58*400 && timeInterval_3 >= 58*2) ? 1 : 0;
 
 			// Convert sensor measurements to a distance in cm, or "--" if range is invalid
+			/*
 			if(sensor1 && sensor2 && sensor3) {
 				sprintf(message, "%2d%2d%2d", timeInterval_1/58, timeInterval_2/58, timeInterval_3/58);
 			} else if(sensor1 && sensor2 && !sensor3) {
@@ -485,31 +517,39 @@ int main(void){
 			} else {
 				sprintf(message, "%s", "------");
 			}
+			*/
 
 			if(sensor1 || sensor2 || sensor3) {
-				if(timeInterval_1 < 58*30 ||
-				   timeInterval_2 < 58*30 ||
-				   timeInterval_3 < 50*30) {
-					// If any direction within 30cm, play constant noise
-					playBeeps(0);
-				} else if(timeInterval_1 < 58*60 ||
-						  timeInterval_2 < 58*60 ||
-						  timeInterval_3 < 50*60) {
-					// If any direction within 60cm, play medium beeps
-					playBeeps(1);
-				} else if(timeInterval_1 < 58*90 ||
-						  timeInterval_2 < 58*90 ||
-						  timeInterval_3 < 50*90) {
-					// If any direction within 90cm, play slow beeps
-					playBeeps(2);
+				if(timeInterval_1 < 58*50 ||
+				   timeInterval_2 < 58*50 ||
+				   timeInterval_3 < 58*50) {
+					// If any direction within 50cm, play high frequency beeps
+					NextBuffer(0);
+					NextBuffer(1);
+				} else if(timeInterval_1 < 58*100 ||
+						  timeInterval_2 < 58*100 ||
+						  timeInterval_3 < 58*100) {
+					// If any direction within 100cm, play medium beeps
+					NextBuffer(2);
+					NextBuffer(3);
+				} else if(timeInterval_1 < 58*150 ||
+						  timeInterval_2 < 58*150 ||
+						  timeInterval_3 < 58*150) {
+					// If any direction within 150cm, play slow beeps
+					NextBuffer(4);
+					NextBuffer(5);
 				} else {
 					// If no object in range, then silence
-					playBeeps(3);
+					NextBuffer(6);
+					NextBuffer(7);
 				}
 			}
 		} else {
-			enterLowPowerState();
 			sprintf(message, "%s", " OFF  ");
+			TIM1->CCR1 &= ~TIM_CCR1_CCR1;
+			TIM1->CCR1 |= 0x7;
+			NextBuffer(6);
+			NextBuffer(7);
 		}
 		
 		LCD_DisplayString((uint8_t *) message);

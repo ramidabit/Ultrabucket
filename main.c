@@ -369,10 +369,8 @@ void exitLowPowerState() {
 }
 
 void playBeeps(int speed) {
-	i2s_transmit(audio_buf,0,AUDIO_BUFSIZ);
 	NextBuffer(0);
 	NextBuffer(1);
-	i2s_transmit(audio_buf,0,AUDIO_BUFSIZ);
 
 	if(speed == 0) {
 		delay(93);
@@ -436,9 +434,8 @@ int main(void){
 	I2C_SendData(I2C1,slave_addr,data_send,1);
 	I2C_ReceiveData(I2C1,slave_addr,data_receive,1);
 	
-	// Initialize DAC and DMA
+	// Initialize DAC for audio
 	cs43l22_play();
-	DMA_Init();
 
 	bool active = 1;
 	bool sensor1 = 0;
@@ -454,10 +451,15 @@ int main(void){
 		if(currentSpeed.x > THRESHOLD || currentSpeed.x < -1*THRESHOLD ||
 			 currentSpeed.y > THRESHOLD || currentSpeed.y < -1*THRESHOLD) {
 			active = !active;
+
+			// Wait 3 seconds for user to be able to put on hat
+			//  without it toggling its status a second time
+			delay(3000);
 		}
 
 		if(active) {
 			exitLowPowerState();
+			DMA_Init();
 
 			// The HC-SR04 sensor can measure distances between 2cm and 400cm,
 			//  but the user will soon hit something if they are within 100cm

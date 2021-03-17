@@ -110,10 +110,6 @@ void DMA_Init(void) {
 	DMA2_Channel6->CCR |= DMA_CCR_TCIE;
 	/* Enable DMA2 Channel 6 */
 	DMA2_Channel6->CCR |= DMA_CCR_EN;
-	/* Set highest priority interrupt */
-	NVIC_SetPriority(DMA2_Channel6_IRQn, 0);
-	/* Enable Interrupt */
-	NVIC_EnableIRQ(DMA2_Channel6_IRQn);
 
 	return;
 }

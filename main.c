@@ -13,6 +13,13 @@
 #include "SysTimer.h"
 #include "stm32l476xx.h"
 #include <stdio.h>
+#include <stdint.h>
+#include <math.h>
+#include "string.h"
+#include "stdlib.h"
+#include "i2c.h"
+#include "cs43l22.h"
+#include "chiptune.h"
 
 // Threshold for toggling functionality using gyroscope
 int THRESHOLD = 300;
@@ -136,7 +143,7 @@ void Ch1_Input_Capture_Setup() {
 	// Enable the counter
 	TIM2->CR1 |= 0x1;
 
-	// Enable TIM4_IRQn interrupt in NVIC and set priority to 2
+	// Enable TIM4_IRQn interrupt in NVIC and set highest priority
 	NVIC_EnableIRQ(TIM2_IRQn);
 	NVIC_SetPriority(TIM2_IRQn, 2);
 }
@@ -188,7 +195,7 @@ void Ch2_Input_Capture_Setup() {
 	// Enable the counter
 	TIM2->CR1 |= 0x1;
 
-	// Enable TIM4_IRQn interrupt in NVIC and set priority to 2
+	// Enable TIM4_IRQn interrupt in NVIC and set highest priority
 	NVIC_EnableIRQ(TIM2_IRQn);
 	NVIC_SetPriority(TIM2_IRQn, 2);
 }
@@ -240,7 +247,7 @@ void Ch3_Input_Capture_Setup() {
 	// Enable the counter
 	TIM2->CR1 |= 0x1;
 
-	// Enable TIM4_IRQn interrupt in NVIC and set priority to 2
+	// Enable TIM4_IRQn interrupt in NVIC and set highest priority
 	NVIC_EnableIRQ(TIM2_IRQn);
 	NVIC_SetPriority(TIM2_IRQn, 2);
 }
@@ -361,6 +368,26 @@ void exitLowPowerState() {
 	RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
 }
 
+void playBeeps(int speed) {
+	i2s_transmit(audio_buf,0,AUDIO_BUFSIZ);
+	NextBuffer(0);
+	NextBuffer(1);
+	i2s_transmit(audio_buf,0,AUDIO_BUFSIZ);
+
+	if(speed == 0) {
+		delay(93);
+	} else if(speed == 1) {
+		delay(88);
+	} else if(speed == 2) {
+		delay(83);
+	} else {
+		delay(0);
+	}
+
+	NextBuffer(2);
+	NextBuffer(3);
+}
+
 int main(void){
 	// Enable High Speed Internal Clock (HSI = 16 MHz)
 	RCC->CR |= RCC_CR_HSION;
@@ -390,11 +417,30 @@ int main(void){
 
 	// Initialize Gyroscope
 	GYRO_Init();
-
 	// Initalize currentSpeed
 	updateSpeed();
 
-	bool active = 0;
+	uint8_t data_receive[6];
+	uint8_t data_send[6];
+	int slave_addr;
+
+	data_receive[0]=0;
+
+	I2C_GPIO_Init();
+	I2C_Initialization();
+	SAI_Init();
+	cs43l22_init();
+
+	slave_addr=0x94;
+	data_send[0]=CS43L22_REG_ID;
+	I2C_SendData(I2C1,slave_addr,data_send,1);
+	I2C_ReceiveData(I2C1,slave_addr,data_receive,1);
+	
+	// Initialize DAC and DMA
+	cs43l22_play();
+	DMA_Init();
+
+	bool active = 1;
 	bool sensor1 = 0;
 	bool sensor2 = 0;
 	bool sensor3 = 0;
@@ -436,6 +482,28 @@ int main(void){
 				sprintf(message, "%s%2d", "----", timeInterval_3/58);
 			} else {
 				sprintf(message, "%s", "------");
+			}
+
+			if(sensor1 || sensor2 || sensor3) {
+				if(timeInterval_1 < 58*30 ||
+				   timeInterval_2 < 58*30 ||
+				   timeInterval_3 < 50*30) {
+					// If any direction within 30cm, play constant noise
+					playBeeps(0);
+				} else if(timeInterval_1 < 58*60 ||
+						  timeInterval_2 < 58*60 ||
+						  timeInterval_3 < 50*60) {
+					// If any direction within 60cm, play medium beeps
+					playBeeps(1);
+				} else if(timeInterval_1 < 58*90 ||
+						  timeInterval_2 < 58*90 ||
+						  timeInterval_3 < 50*90) {
+					// If any direction within 90cm, play slow beeps
+					playBeeps(2);
+				} else {
+					// If no object in range, then silence
+					playBeeps(3);
+				}
 			}
 		} else {
 			enterLowPowerState();

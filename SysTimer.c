@@ -16,7 +16,7 @@ void SysTick_Init(void){
 	SysTick->CTRL = 0;										// Disable SysTick IRQ and SysTick Counter
 	
 	// SysTick Reload Value Register
-	SysTick->LOAD = 80000000/1000 - 1;    // 1ms, Default clock
+	SysTick->LOAD = 999;
 	
 	// SysTick Current Value Register
 	SysTick->VAL = 0;
@@ -31,7 +31,7 @@ void SysTick_Init(void){
 	
 	// Select processor clock
 	// 1 = processor clock;  0 = external clock
-	SysTick->CTRL |= SysTick_CTRL_CLKSOURCE_Msk;		
+	SysTick->CTRL &= ~SysTick_CTRL_CLKSOURCE_Msk;
 	
 	// Enable SysTick IRQ and SysTick Timer
 	SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;  

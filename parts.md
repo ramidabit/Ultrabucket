@@ -6,15 +6,16 @@
 ## Parts
 
 ### Peripherals
-- HC-SR04 Ultrasonic Sensors (2-3)
 - L3GD20 Gyroscope
-- Audio Jack
-- LED Strip
+- HC-SR04 Ultrasonic Sensors (3x)
+- Audio jack
+- WS2812B LED
 
 ### Serial Interface Protocols
-- I2S
-- I2C
 - SPI
+- SAI/I2S
+- I2C
+- PWM
 
 ### Miscellaneous
 - Bucket hat to house peripherals

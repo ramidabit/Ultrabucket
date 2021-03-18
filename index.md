@@ -14,8 +14,8 @@ Rami Dabit, Kyle Kam
 ### Demonstration
 <iframe width="560" height="315" src="https://www.youtube.com/embed/yDvMxbEF3eI" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
-### Block Diagram
-![Image](https://i.imgur.com/FgMMk18.png)
-
 ### Internals
 ![Image](https://i.imgur.com/HGnQyTU.jpg)
+
+### Block Diagram
+![Image](https://i.imgur.com/KpoVYrc.png)

@@ -1,3 +1,10 @@
+/*
+ * ECE 153B - Winter 2021
+ *
+ * Names: Rami Dabit, Kyle Kam
+ * Section: Wednesday 7:00-9:50pm
+ */
+
 #ifndef __STM32L476G_DISCOVERY_L3GD20_H
 #define __STM32L476G_DISCOVERY_L3GD20_H
 

@@ -5,32 +5,25 @@
  * Section: Wednesday 7:00-9:50pm
  */
 
-#include "LCD.h"
-#include "L3GD20.h"
+#include "stm32l476xx.h"
 #include "UART.h"
+#include "LCD.h"
 #include "SPI.h"
+#include "L3GD20.h"
 #include "SysClock.h"
 #include "SysTimer.h"
-#include "stm32l476xx.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
 #include "string.h"
 #include "stdlib.h"
-#include "i2c.h"
+#include "I2C.h"
 #include "cs43l22.h"
 #include "chiptune.h"
+#include "sensors.h"
 
 // Threshold for toggling functionality using gyroscope
 int THRESHOLD = 300;
-
-typedef struct {
-	float x; 
-	float y; 
-	float z; 
-} L3GD20_Data_t;
-
-L3GD20_Data_t currentSpeed;
 
 uint32_t volatile currentValue_1 = 0;
 uint32_t volatile currentValue_2 = 0;
@@ -45,257 +38,13 @@ uint32_t volatile timeInterval_1 = 0;
 uint32_t volatile timeInterval_2 = 0;
 uint32_t volatile timeInterval_3 = 0;
 
-void PWM_Init() {
-    // Enable GPIO port E clock
-    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOEEN;
-    // Configure PE8 as alternative function (10)
-    GPIOE->MODER &= ~GPIO_MODER_MODE8;
-    GPIOE->MODER |= GPIO_MODER_MODE8_1;
-    // Configure and select alternative function for PE8 (AF1)
-    GPIOE->AFR[1] &= ~GPIO_AFRL_AFRL0;
-    GPIOE->AFR[1] |= 0x1;
-    // Configure PE8 output speed as very high (11)
-    GPIOE->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR8;
-    // Configure PE8 as no pull-up, no pull-down (00)
-    GPIOE->PUPDR &= ~GPIO_PUPDR_PUPD8;
+typedef struct {
+	float x; 
+	float y; 
+	float z; 
+} L3GD20_Data_t;
 
-    // Enable TIM1 clock
-    RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
-    // Configure PWM Output for TIM1 CH 1N
-    // Set direction such that timer counts down
-    TIM1->CR1 |= TIM_CR1_DIR;
-    // Set prescaler value
-    TIM1->PSC &= ~TIM_PSC_PSC;
-    // Set auto-reload value
-    TIM1->ARR &= ~TIM_ARR_ARR;
-    TIM1->ARR |= 0x13;
-    // Configure channel to be used in output compare mode
-    // Clear the output compare mode bits
-    TIM1->CCMR1 &= ~TIM_CCMR1_OC1M;
-    // Set output compare mode bits to PWM mode 1
-    TIM1->CCMR1 |= TIM_CCMR1_OC1M_1;
-    TIM1->CCMR1 |= TIM_CCMR1_OC1M_2;
-    // Enable output preload
-    TIM1->CCMR1 |= TIM_CCMR1_OC1PE;
-    // Set the output polarity for compare 1 to active high
-    TIM1->CCER &= ~TIM_CCER_CC1NP;
-    // Enable channel 1N output
-    TIM1->CCER |= TIM_CCER_CC1NE;
-    // Enable main output
-    TIM1->BDTR |= TIM_BDTR_MOE;
-    // Set capture/compare value for duty cycle of PWM output
-    TIM1->CCR1 &= ~TIM_CCR1_CCR1;
-    TIM1->CCR1 |= 0x7;
-    // Enable the counter
-    TIM1->CR1 |= 0x1;
-}
-
-void Trigger_Setup() {
-	// Enable GPIO port E clock
-	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOEEN;
-	// Configure PE11 as alternative function (10)
-	GPIOE->MODER &= ~GPIO_MODER_MODE11;
-	GPIOE->MODER |= GPIO_MODER_MODE11_1;
-	// Configure and select alternative function for PE11 (AF1)
-	GPIOE->AFR[1] &= ~GPIO_AFRL_AFRL3;
-	GPIOE->AFR[1] |= (0x1 << 3*4);
-	// Configure PE11 as no pull-up, no pull-down (00)
-	GPIOE->PUPDR &= ~GPIO_PUPDR_PUPD11;
-	// Configure PE11 output type as push-pull (0)
-	GPIOE->OTYPER &= ~GPIO_OTYPER_OT11;
-	// Configure PE11 output speed as very high (11)
-	GPIOE->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR11;
-
-	// Enable TIM1 clock
-	RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
-	// Set prescaler value to 15
-	TIM1->PSC &= ~TIM_PSC_PSC;
-	TIM1->PSC |= 0xF;
-	// Enable preload for TIM1 CH 2
-	TIM1->CR1 |= TIM_CR1_ARPE;
-	// Set auto-reload value to 20
-	TIM1->ARR &= ~TIM_ARR_ARR;
-	TIM1->ARR |= 0x14;
-	// Set capture and compare value to 10
-	TIM1->CCR2 &= ~TIM_CCR2_CCR2;
-	TIM1->CCR2 |= 0xA;
-	// Configure channel to be used in output compare mode
-	// Clear the output compare mode bits for channel 2
-	TIM1->CCMR1 &= ~TIM_CCMR1_OC2M;
-	// Set output control mode bits to PWM mode 1
-	TIM1->CCMR1 |= TIM_CCMR1_OC2M_1;
-	TIM1->CCMR1 |= TIM_CCMR1_OC2M_2;
-	// Enable output compare preload
-	TIM1->CCMR1 |= TIM_CCMR1_OC2PE;
-	// Enable channel 2 output
-	TIM1->CCER |= TIM_CCER_CC2E;
-	// Enable main output and off-state selection
-	TIM1->BDTR |= TIM_BDTR_MOE | TIM_BDTR_OSSR;
-	// Enable update generation
-	TIM1->EGR |= 0x1;
-	// Enable update interrupt for timer 4
-	TIM1->DIER |= TIM_DIER_UIE;
-	// Clear update interrupt flag
-	TIM1->SR &= ~TIM_SR_UIF;
-	// Set direction such that timer counts up
-	TIM1->CR1 &= ~TIM_CR1_DIR;
-	// Enable the counter
-	TIM1->CR1 |= 0x1;
-}
-
-void Ch1_Input_Capture_Setup() {
-	// Enable GPIO port A clock
-	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
-	// Configure PA0 as alternative function (10)
-	GPIOA->MODER &= ~GPIO_MODER_MODE0;
-	GPIOA->MODER |= GPIO_MODER_MODE0_1;
-	// Configure and select alternative function for PA0 (AF1)
-	GPIOA->AFR[0] &= ~GPIO_AFRL_AFRL0;
-	GPIOA->AFR[0] |= 0x1;
-	// Configure PA0 as no pull-up, no pull-down (00)
-	GPIOA->PUPDR &= ~GPIO_PUPDR_PUPD0;
-
-	// Enable TIM2 clock
-	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM2EN;
-	// Set prescaler value to 15
-	TIM2->PSC &= ~TIM_PSC_PSC;
-	TIM2->PSC |= 0xF;
-	// Enable preload for timer 2
-	TIM2->CR1 |= TIM_CR1_ARPE;
-	// Set auto-reload value to max
-	TIM2->ARR |= TIM_ARR_ARR;
-	// Configure channel to be used in input capture mode
-	// Clear capture and compare mode register
-	TIM2->CCMR1 &= ~TIM_CCMR1_CC1S;
-	// Set to capture input on timer channel 1
-	TIM2->CCMR1 |= TIM_CCMR1_CC1S_0;
-	// Enable input capture on both rising and falling edges
-	TIM2->CCER |= TIM_CCER_CC1E;
-	TIM2->CCER |= TIM_CCER_CC1P;
-	TIM2->CCER |= TIM_CCER_CC1NP;
-	// Enable interrupts for timer 2
-	TIM2->DIER |= TIM_DIER_CC1IE;
-	// Enable DMA requests for timer 2
-	TIM2->DIER |= TIM_DIER_CC1DE;
-	// Enable update interrupt for timer 2
-	TIM2->DIER |= TIM_DIER_UIE;
-	// Enable update generation
-	TIM2->EGR |= 0x1;
-	// Clear update interrupt flag
-	TIM2->SR &= ~TIM_SR_UIF;
-	// Set direction such that timer counts up
-	TIM2->CR1 &= ~TIM_CR1_DIR;
-	// Enable the counter
-	TIM2->CR1 |= 0x1;
-
-	// Enable TIM4_IRQn interrupt in NVIC and set highest priority
-	NVIC_EnableIRQ(TIM2_IRQn);
-	NVIC_SetPriority(TIM2_IRQn, 2);
-}
-
-void Ch2_Input_Capture_Setup() {
-	// Please note: Many steps are repeated in case Ch2 is used on its own
-
-	// Enable GPIO port A clock
-	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
-	// Configure PA1 as alternative function (10)
-	GPIOA->MODER &= ~GPIO_MODER_MODE1;
-	GPIOA->MODER |= GPIO_MODER_MODE1_1;
-	// Configure and select alternative function for PA1 (AF1)
-	GPIOA->AFR[0] &= ~GPIO_AFRL_AFRL1;
-	GPIOA->AFR[0] |= (0x1 << 1*4);
-	// Configure PA1 as no pull-up, no pull-down (00)
-	GPIOA->PUPDR &= ~GPIO_PUPDR_PUPD1;
-
-	// Enable TIM2 clock
-	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM2EN;
-	// Set prescaler value to 15
-	TIM2->PSC &= ~TIM_PSC_PSC;
-	TIM2->PSC |= 0xF;
-	// Enable preload for timer 2
-	TIM2->CR1 |= TIM_CR1_ARPE;
-	// Set auto-reload value to max
-	TIM2->ARR |= TIM_ARR_ARR;
-	// Configure channel to be used in input capture mode
-	// Clear capture and compare mode register
-	TIM2->CCMR1 &= ~TIM_CCMR1_CC2S;
-	// Set to capture input on timer channel 2
-	TIM2->CCMR1 |= TIM_CCMR1_CC2S_0;
-	// Enable input capture on both rising and falling edges
-	TIM2->CCER |= TIM_CCER_CC2E;
-	TIM2->CCER |= TIM_CCER_CC2P;
-	TIM2->CCER |= TIM_CCER_CC2NP;
-	// Enable interrupts for timer 2
-	TIM2->DIER |= TIM_DIER_CC2IE;
-	// Enable DMA requests for timer 2
-	TIM2->DIER |= TIM_DIER_CC2DE;
-	// Enable update interrupt for timer 2
-	TIM2->DIER |= TIM_DIER_UIE;
-	// Enable update generation
-	TIM2->EGR |= 0x1;
-	// Clear update interrupt flag
-	TIM2->SR &= ~TIM_SR_UIF;
-	// Set direction such that timer counts up
-	TIM2->CR1 &= ~TIM_CR1_DIR;
-	// Enable the counter
-	TIM2->CR1 |= 0x1;
-
-	// Enable TIM4_IRQn interrupt in NVIC and set highest priority
-	NVIC_EnableIRQ(TIM2_IRQn);
-	NVIC_SetPriority(TIM2_IRQn, 2);
-}
-
-void Ch3_Input_Capture_Setup() {
-	// Please note: Many steps are repeated in case Ch3 is used on its own
-
-	// Enable GPIO port A clock
-	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
-	// Configure PA2 as alternative function (10)
-	GPIOA->MODER &= ~GPIO_MODER_MODE2;
-	GPIOA->MODER |= GPIO_MODER_MODE2_1;
-	// Configure and select alternative function for PA2 (AF1)
-	GPIOA->AFR[0] &= ~GPIO_AFRL_AFRL2;
-	GPIOA->AFR[0] |= (0x1 << 2*4);
-	// Configure PA2 as no pull-up, no pull-down (00)
-	GPIOA->PUPDR &= ~GPIO_PUPDR_PUPD2;
-
-	// Enable TIM2 clock
-	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM2EN;
-	// Set prescaler value to 15
-	TIM2->PSC &= ~TIM_PSC_PSC;
-	TIM2->PSC |= 0xF;
-	// Enable preload for timer 2
-	TIM2->CR1 |= TIM_CR1_ARPE;
-	// Set auto-reload value to max
-	TIM2->ARR |= TIM_ARR_ARR;
-	// Configure channel to be used in input capture mode
-	// Clear capture and compare mode register
-	TIM2->CCMR2 &= ~TIM_CCMR2_CC3S;
-	// Set to capture input on timer channel 3
-	TIM2->CCMR2 |= TIM_CCMR2_CC3S_0;
-	// Enable input capture on both rising and falling edges
-	TIM2->CCER |= TIM_CCER_CC3E;
-	TIM2->CCER |= TIM_CCER_CC3P;
-	TIM2->CCER |= TIM_CCER_CC3NP;
-	// Enable interrupts for timer 2
-	TIM2->DIER |= TIM_DIER_CC3IE;
-	// Enable DMA requests for timer 2
-	TIM2->DIER |= TIM_DIER_CC3DE;
-	// Enable update interrupt for timer 2
-	TIM2->DIER |= TIM_DIER_UIE;
-	// Enable update generation
-	TIM2->EGR |= 0x1;
-	// Clear update interrupt flag
-	TIM2->SR &= ~TIM_SR_UIF;
-	// Set direction such that timer counts up
-	TIM2->CR1 &= ~TIM_CR1_DIR;
-	// Enable the counter
-	TIM2->CR1 |= 0x1;
-
-	// Enable TIM4_IRQn interrupt in NVIC and set highest priority
-	NVIC_EnableIRQ(TIM2_IRQn);
-	NVIC_SetPriority(TIM2_IRQn, 2);
-}
+L3GD20_Data_t currentSpeed;
 
 void TIM2_IRQHandler(void) {
 	// currentValue = CCR_New
@@ -351,6 +100,51 @@ void TIM2_IRQHandler(void) {
 			}
 		}
 	}
+}
+
+void PWM_Init() {
+    // Enable GPIO port E clock
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOEEN;
+    // Configure PE8 as alternative function (10)
+    GPIOE->MODER &= ~GPIO_MODER_MODE8;
+    GPIOE->MODER |= GPIO_MODER_MODE8_1;
+    // Configure and select alternative function for PE8 (AF1)
+    GPIOE->AFR[1] &= ~GPIO_AFRL_AFRL0;
+    GPIOE->AFR[1] |= 0x1;
+    // Configure PE8 output speed as very high (11)
+    GPIOE->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR8;
+    // Configure PE8 as no pull-up, no pull-down (00)
+    GPIOE->PUPDR &= ~GPIO_PUPDR_PUPD8;
+
+    // Enable TIM1 clock
+    RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
+    // Configure PWM Output for TIM1 CH 1N
+    // Set direction such that timer counts down
+    TIM1->CR1 |= TIM_CR1_DIR;
+    // Set prescaler value
+    TIM1->PSC &= ~TIM_PSC_PSC;
+    // Set auto-reload value
+    TIM1->ARR &= ~TIM_ARR_ARR;
+    TIM1->ARR |= 0x13;
+    // Configure channel to be used in output compare mode
+    // Clear the output compare mode bits
+    TIM1->CCMR1 &= ~TIM_CCMR1_OC1M;
+    // Set output compare mode bits to PWM mode 1
+    TIM1->CCMR1 |= TIM_CCMR1_OC1M_1;
+    TIM1->CCMR1 |= TIM_CCMR1_OC1M_2;
+    // Enable output preload
+    TIM1->CCMR1 |= TIM_CCMR1_OC1PE;
+    // Set the output polarity for compare 1 to active high
+    TIM1->CCER &= ~TIM_CCER_CC1NP;
+    // Enable channel 1N output
+    TIM1->CCER |= TIM_CCER_CC1NE;
+    // Enable main output
+    TIM1->BDTR |= TIM_BDTR_MOE;
+    // Set capture/compare value for duty cycle of PWM output
+    TIM1->CCR1 &= ~TIM_CCR1_CCR1;
+    TIM1->CCR1 |= 0x7;
+    // Enable the counter
+    TIM1->CR1 |= 0x1;
 }
 
 void setStationary(int xStat, int yStat, int zStat) {
@@ -467,6 +261,7 @@ int main(void) {
 	cs43l22_play();
 
 	bool active = 0;
+	bool led_on = 0;
 	bool sensor1 = 0;
 	bool sensor2 = 0;
 	bool sensor3 = 0;
@@ -488,8 +283,11 @@ int main(void) {
 
 		if(active) {
 			sprintf(message, "%s", "  ON  ");
-			TIM1->CCR1 &= ~TIM_CCR1_CCR1;
-			TIM1->CCR1 |= 0xD;
+			if(!led_on) {
+				TIM1->CCR1 &= ~TIM_CCR1_CCR1;
+				TIM1->CCR1 |= 0xD;
+				led_on = 1;
+			}
 			exitLowPowerState();
 			DMA_Init();
 
@@ -546,8 +344,11 @@ int main(void) {
 			}
 		} else {
 			sprintf(message, "%s", " OFF  ");
-			TIM1->CCR1 &= ~TIM_CCR1_CCR1;
-			TIM1->CCR1 |= 0x7;
+			if(led_on) {
+				TIM1->CCR1 &= ~TIM_CCR1_CCR1;
+				TIM1->CCR1 |= 0x7;
+				led_on = 0;
+			}
 			NextBuffer(6);
 			NextBuffer(7);
 		}
